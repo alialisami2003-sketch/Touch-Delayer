@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Touch Delayer</string>
+    <string name="accessibility_service_label">مؤخر اللمس (Touch Delayer)</string>
+    <string name="accessibility_service_description">رصد اللمس وتأخيره: يستخدم هذا التطبيق المساعد لتأخير النقرات على مساحة الدوائر المحددة ومحاكاتها بعد المدة المطلوبة.</string>
+</resources>

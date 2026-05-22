@@ -1,0 +1,6 @@
+{
+  "name": "Touch Delayer",
+  "description": "Create customizable transparent floating overlays to delay touch interactions on any part of your screen in the background.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
