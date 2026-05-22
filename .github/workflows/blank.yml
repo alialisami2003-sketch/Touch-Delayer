@@ -5,15 +5,11 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
-  workflow_dispatch: # هذا التعليق الآن صحيح ولن يسبب خطأ
+  workflow_dispatch: 
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
-    # حل مشكلة إصدار Node.js
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true 
 
     steps:
       - name: Checkout code
