@@ -1,23 +1,30 @@
 name: Android CI
 on:
-  workflow_dispatch: # يسمح لك بتشغيل الإجراء يدوياً
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+      
       - name: set up JDK
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
+      
+      - name: List project structure (debug)
+        run: |
+          ls -la
+          ls -la app/ || echo "No app folder"
+          find . -name "*.gradle" -type f
+      
       - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+        run: |
+          chmod +x gradlew || echo "No gradlew file"
+          chmod +x gradlew.bat || echo "No gradlew.bat"
+      
       - name: Build debug APK
-        run: ./gradlew assembleDebug
-      - name: Upload APK
-        uses: actions/upload-artifact@v3
-        with:
-          name: app-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+        run: ./gradlew assembleDebug --stacktrace
+        
