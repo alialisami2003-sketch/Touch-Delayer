@@ -5,16 +5,15 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
-  workflow_dispatch: # يتيح لك تشغيل البناء يدوياً
+  workflow_dispatch: # هذا التعليق الآن صحيح ولن يسبب خطأ
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
-    # --- الحل لمشكلة الخطأ التي ظهرت سابقاً ---
+    # حل مشكلة إصدار Node.js
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true 
-    # ---------------------------------------
 
     steps:
       - name: Checkout code
@@ -27,14 +26,15 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
-      - name: Grant execute permission for gradlew
+      - name: Make gradlew executable
         run: chmod +x gradlew
 
       - name: Build with Gradle
-        run: ./gradlew assembleDebug
+        run: ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: app-debug
-          path: app/build/outputs/apk/debug/*.apk
+          path: app/build/outputs/apk/debug/**/*.apk
+          retention-days: 5
