@@ -60,6 +60,7 @@ fun MainControlPanel(
     val isOverlayGranted by viewModel.isOverlayPermissionGranted.collectAsStateWithLifecycle()
     val isPositioningMode by viewModel.isPositioningMode.collectAsStateWithLifecycle()
     val isDelayEnabled by viewModel.isDelayEnabled.collectAsStateWithLifecycle()
+    val isSystemActive by viewModel.isSystemActive.collectAsStateWithLifecycle()
 
     var selectedTab by remember { mutableStateOf(0) } // 0 = التحكم, 1 = الإعدادات, 2 = التقارير
 
@@ -80,25 +81,89 @@ fun MainControlPanel(
             CenterAlignedTopAppBar(
                 title = {
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(30.dp)
+                                .size(24.dp)
                                 .background(primaryPurple, CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("◍", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            Text("◍", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = "TouchGuard",
                             fontWeight = FontWeight.ExtraBold,
-                            fontSize = 20.sp,
+                            fontSize = 17.sp,
                             color = darkCharcoal,
                             fontFamily = FontFamily.SansSerif
                         )
+                    }
+                },
+                actions = {
+                    Row(
+                        modifier = Modifier.padding(end = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Stop button - completely deactivates system
+                        FilledTonalButton(
+                            onClick = {
+                                viewModel.setSystemActive(false)
+                                showSingleToast(context, "تم إيقاف عمل التطبيق والدوائر بالكامل 🛑")
+                            },
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = if (!isSystemActive) Color(0xFFC53030) else Color(0xFFFFF5F5),
+                                contentColor = if (!isSystemActive) Color.White else Color(0xFFC53030)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp),
+                            modifier = Modifier
+                                .height(38.dp)
+                                .border(
+                                    width = 1.dp,
+                                    color = if (!isSystemActive) Color(0xFFC53030) else Color(0xFFFDC8C8),
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Stop",
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("إيقاف 🛑", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                        }
+
+                        // Start button - completely activates/enables system
+                        FilledTonalButton(
+                            onClick = {
+                                viewModel.setSystemActive(true)
+                                showSingleToast(context, "تم تفعيل وتشغيل مؤخر اللمس والدوائر بالخلفية 🟢")
+                            },
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = if (isSystemActive) Color(0xFF2F855A) else Color(0xFFF6FBF7),
+                                contentColor = if (isSystemActive) Color.White else Color(0xFF2F855A)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp),
+                            modifier = Modifier
+                                .height(38.dp)
+                                .border(
+                                    width = 1.dp,
+                                    color = if (isSystemActive) Color(0xFF2F855A) else Color(0xFFC6E7D2),
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PlayArrow,
+                                contentDescription = "Start",
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("تشغيل 🟢", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -114,6 +179,7 @@ fun MainControlPanel(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
+
             // Main scrollable control list
             LazyColumn(
                 modifier = Modifier
@@ -140,11 +206,16 @@ fun MainControlPanel(
                             Box(
                                 modifier = Modifier
                                     .size(8.dp)
-                                    .background(if (isServiceActive) Color(0xFF38A169) else Color(0xFFEF4444), CircleShape)
+                                    .background(
+                                        if (!isSystemActive) Color(0xFFD69E2E) // Orange warning for stopped
+                                        else if (isServiceActive) Color(0xFF38A169) // Green for active
+                                        else Color(0xFFEF4444) // Red for ungranted/inactive
+                                        , CircleShape
+                                    )
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = if (isServiceActive) "خدمة الخلفية: مفعلة" else "خدمة الخلفية: غير مفعلة",
+                                text = if (!isSystemActive) "الحالة: موقوف مؤقتاً 🛑" else if (isServiceActive) "خدمة الخلفية: مفعلة 🟢" else "خدمة الخلفية: غير مفعلة ⚠️",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = activePillText
@@ -313,10 +384,14 @@ fun MainControlPanel(
                                         val intent = Intent(
                                             Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                                             Uri.parse("package:${context.packageName}")
-                                        )
+                                        ).apply {
+                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        }
                                         context.startActivity(intent)
                                     } catch (e: Exception) {
-                                        val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+                                        val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
+                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        }
                                         context.startActivity(intent)
                                     }
                                 }
@@ -334,7 +409,9 @@ fun MainControlPanel(
                                 isGranted = isServiceActive,
                                 primaryPurple = primaryPurple,
                                 onGrantClick = {
-                                    val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                                    val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    }
                                     context.startActivity(intent)
                                     showSingleToast(
                                         context,
@@ -391,10 +468,14 @@ fun MainControlPanel(
                                         val intent = Intent(
                                             Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                                             Uri.parse("package:${context.packageName}")
-                                        )
+                                        ).apply {
+                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        }
                                         context.startActivity(intent)
                                     } catch (e: Exception) {
-                                        val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+                                        val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
+                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        }
                                         context.startActivity(intent)
                                     }
                                 }
@@ -412,7 +493,9 @@ fun MainControlPanel(
                                 isGranted = isServiceActive,
                                 primaryPurple = primaryPurple,
                                 onGrantClick = {
-                                    val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                                    val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    }
                                     context.startActivity(intent)
                                     showSingleToast(
                                         context,

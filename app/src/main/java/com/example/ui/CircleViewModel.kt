@@ -57,6 +57,10 @@ class CircleViewModel(application: Application) : AndroidViewModel(application) 
     private val _isDelayEnabled = MutableStateFlow(true)
     val isDelayEnabled: StateFlow<Boolean> = _isDelayEnabled.asStateFlow()
 
+    // Global system active running state (On / OFF)
+    private val _isSystemActive = MutableStateFlow(true)
+    val isSystemActive: StateFlow<Boolean> = _isSystemActive.asStateFlow()
+
     init {
         val database = AppDatabase.getDatabase(application)
         repository = CircleRepository(database.circleOverlayDao())
@@ -72,6 +76,7 @@ class CircleViewModel(application: Application) : AndroidViewModel(application) 
         // Load initial delay status
         val prefs = application.getSharedPreferences("TouchDelayPrefs", Context.MODE_PRIVATE)
         _isDelayEnabled.value = prefs.getBoolean("is_delay_enabled", true)
+        _isSystemActive.value = prefs.getBoolean("is_system_active", true)
         
         // Start periodic permission and service status checker
         startPermissionStatusChecker()
@@ -97,6 +102,7 @@ class CircleViewModel(application: Application) : AndroidViewModel(application) 
         
         val prefs = context.getSharedPreferences("TouchDelayPrefs", Context.MODE_PRIVATE)
         _isDelayEnabled.value = prefs.getBoolean("is_delay_enabled", true)
+        _isSystemActive.value = prefs.getBoolean("is_system_active", true)
     }
 
     /**
@@ -116,6 +122,15 @@ class CircleViewModel(application: Application) : AndroidViewModel(application) 
         val nextVal = !_isPositioningMode.value
         _isPositioningMode.value = nextVal
         TouchDelayAccessibilityService.updatePositioningMode(nextVal)
+    }
+
+    /**
+     * Completely enables/disables the app background operations and overlays (ON/OFF).
+     */
+    fun setSystemActive(active: Boolean) {
+        val context = getApplication<Application>()
+        _isSystemActive.value = active
+        TouchDelayAccessibilityService.updateSystemActive(context, active)
     }
 
     /**

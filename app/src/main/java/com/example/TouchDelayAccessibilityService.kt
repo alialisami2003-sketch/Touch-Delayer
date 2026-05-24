@@ -54,6 +54,10 @@ class TouchDelayAccessibilityService : AccessibilityService() {
         var isDelayEnabled = true
             private set
 
+        @Volatile
+        var isSystemActive = true
+            private set
+
         private var serviceInstance: TouchDelayAccessibilityService? = null
 
         fun updatePositioningMode(active: Boolean) {
@@ -70,6 +74,21 @@ class TouchDelayAccessibilityService : AccessibilityService() {
                 floatingToggleButton?.updateState()
             }
         }
+
+        fun updateSystemActive(context: Context, active: Boolean) {
+            isSystemActive = active
+            val prefs = context.getSharedPreferences("TouchDelayPrefs", Context.MODE_PRIVATE)
+            prefs.edit().putBoolean("is_system_active", active).apply()
+            serviceInstance?.apply {
+                if (active) {
+                    showFloatingToggleButton()
+                    refreshOverlayLayouts()
+                } else {
+                    removeAllOverlays()
+                    removeFloatingToggleButton()
+                }
+            }
+        }
     }
 
     override fun onCreate() {
@@ -80,13 +99,16 @@ class TouchDelayAccessibilityService : AccessibilityService() {
         
         val prefs = getSharedPreferences("TouchDelayPrefs", Context.MODE_PRIVATE)
         isDelayEnabled = prefs.getBoolean("is_delay_enabled", true)
+        isSystemActive = prefs.getBoolean("is_system_active", true)
         
         serviceInstance = this
         isServiceRunning = true
         Log.d(TAG, "Accessibility Service created")
         
         // Add floating Enable/Disable widget
-        showFloatingToggleButton()
+        if (isSystemActive) {
+            showFloatingToggleButton()
+        }
     }
 
     override fun onServiceConnected() {
@@ -131,6 +153,7 @@ class TouchDelayAccessibilityService : AccessibilityService() {
     }
 
     private fun showFloatingToggleButton() {
+        if (!isSystemActive) return
         if (floatingToggleButton != null) return
         val density = resources.displayMetrics.density
         val sizePx = (48 * density).roundToInt()
@@ -183,6 +206,9 @@ class TouchDelayAccessibilityService : AccessibilityService() {
      * Recreates or updates layouts of on-screen floating circle overlays.
      */
     private fun updateOverlaysOnScreen(overlays: List<CircleOverlay>) {
+        if (!isSystemActive || !isOverlaysCurrentlyOnScreen) {
+            return
+        }
         // Find overlays to remove
         val currentIdsInDb = overlays.map { it.id }.toSet()
         val idsToRemove = activeOverlays.keys.filter { it !in currentIdsInDb }
@@ -341,7 +367,7 @@ class TouchDelayAccessibilityService : AccessibilityService() {
             moveTo(rawX, rawY)
             lineTo(rawX, rawY + 1.0f) // 1-pixel robust offset to make stroke path valid
         }
-        val duration = 15L // Fast tap signature to trigger instant responses on backing apps
+        val duration = 100L // Highly stable standard tap duration (100ms) to bypass Android touch rejection engine
         val stroke = GestureDescription.StrokeDescription(path, 0, duration)
         val gesture = GestureDescription.Builder().addStroke(stroke).build()
         
@@ -713,14 +739,16 @@ class TouchDelayAccessibilityService : AccessibilityService() {
                         } else {
                             // User tapped it: Delay click if enabled, tap instantly if disabled!
                             val elapsed = android.os.SystemClock.uptimeMillis() - downTime
+                            val centerXOnScreen = layoutParams.x + (width / 2f)
+                            val centerYOnScreen = layoutParams.y + (height / 2f)
                             if (isDelayEnabled) {
                                 val remainingDelay = (mCircle.delayMs - elapsed).coerceAtLeast(0L)
                                 if (remainingDelay > 0L) {
                                     startCountdown(remainingDelay)
                                 }
-                                handleDelayedTap(mCircle, initialTouchX, initialTouchY, remainingDelay)
+                                handleDelayedTap(mCircle, centerXOnScreen, centerYOnScreen, remainingDelay)
                             } else {
-                                handleDelayedTap(mCircle, initialTouchX, initialTouchY, 0L)
+                                handleDelayedTap(mCircle, centerXOnScreen, centerYOnScreen, 0L)
                             }
                         }
                     }
