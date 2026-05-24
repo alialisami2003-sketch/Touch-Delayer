@@ -25,14 +25,14 @@ class CircleViewModel(application: Application) : AndroidViewModel(application) 
     private val _additionHistory = MutableStateFlow<List<Int>>(emptyList())
     val additionHistory: StateFlow<List<Int>> = _additionHistory.asStateFlow()
 
-    private val _undoDelaySeconds = MutableStateFlow(5) // Default 5 seconds
-    val undoDelaySeconds: StateFlow<Int> = _undoDelaySeconds.asStateFlow()
+    private val _undoDelaySeconds = MutableStateFlow(5.0f) // Default 5 seconds, supports down to 0.25f (quarter of a second)
+    val undoDelaySeconds: StateFlow<Float> = _undoDelaySeconds.asStateFlow()
 
     private val _isUndoCountingDown = MutableStateFlow(false)
     val isUndoCountingDown: StateFlow<Boolean> = _isUndoCountingDown.asStateFlow()
 
-    private val _undoCountdownLeft = MutableStateFlow(0)
-    val undoCountdownLeft: StateFlow<Int> = _undoCountdownLeft.asStateFlow()
+    private val _undoCountdownLeftMs = MutableStateFlow(0)
+    val undoCountdownLeftMs: StateFlow<Int> = _undoCountdownLeftMs.asStateFlow()
 
     private var undoJob: Job? = null
 
@@ -53,6 +53,10 @@ class CircleViewModel(application: Application) : AndroidViewModel(application) 
     private val _isPositioningMode = MutableStateFlow(false)
     val isPositioningMode: StateFlow<Boolean> = _isPositioningMode.asStateFlow()
 
+    // Global activation/interception delay state
+    private val _isDelayEnabled = MutableStateFlow(true)
+    val isDelayEnabled: StateFlow<Boolean> = _isDelayEnabled.asStateFlow()
+
     init {
         val database = AppDatabase.getDatabase(application)
         repository = CircleRepository(database.circleOverlayDao())
@@ -64,6 +68,10 @@ class CircleViewModel(application: Application) : AndroidViewModel(application) 
         )
         
         _isPositioningMode.value = TouchDelayAccessibilityService.isPositioningModeActive
+        
+        // Load initial delay status
+        val prefs = application.getSharedPreferences("TouchDelayPrefs", Context.MODE_PRIVATE)
+        _isDelayEnabled.value = prefs.getBoolean("is_delay_enabled", true)
         
         // Start periodic permission and service status checker
         startPermissionStatusChecker()
@@ -83,8 +91,22 @@ class CircleViewModel(application: Application) : AndroidViewModel(application) 
 
     fun checkRealtimeStatuses() {
         val context = getApplication<Application>()
-        _isServiceActive.value = TouchDelayAccessibilityService.isServiceRunning
+        val serviceRunning = TouchDelayAccessibilityService.isServiceRunning
+        _isServiceActive.value = serviceRunning
         _isOverlayPermissionGranted.value = Settings.canDrawOverlays(context)
+        
+        val prefs = context.getSharedPreferences("TouchDelayPrefs", Context.MODE_PRIVATE)
+        _isDelayEnabled.value = prefs.getBoolean("is_delay_enabled", true)
+    }
+
+    /**
+     * Toggles global delayed touch interception.
+     */
+    fun toggleDelayEnabled() {
+        val context = getApplication<Application>()
+        val nextVal = !_isDelayEnabled.value
+        _isDelayEnabled.value = nextVal
+        TouchDelayAccessibilityService.updateDelayEnabled(context, nextVal)
     }
 
     /**
@@ -118,8 +140,8 @@ class CircleViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun setUndoDelaySeconds(seconds: Int) {
-        _undoDelaySeconds.value = seconds.coerceIn(1, 60)
+    fun setUndoDelaySeconds(seconds: Float) {
+        _undoDelaySeconds.value = seconds.coerceIn(0.25f, 60.0f)
     }
 
     fun triggerUndo() {
@@ -128,13 +150,17 @@ class CircleViewModel(application: Application) : AndroidViewModel(application) 
 
         undoJob = viewModelScope.launch(Dispatchers.Main) {
             _isUndoCountingDown.value = true
-            val totalSeconds = _undoDelaySeconds.value
-            _undoCountdownLeft.value = totalSeconds
+            val totalMs = (_undoDelaySeconds.value * 1000).toInt()
+            _undoCountdownLeftMs.value = totalMs
 
-            for (i in totalSeconds downTo 1) {
-                _undoCountdownLeft.value = i
-                delay(1000)
+            val tickMs = 100
+            var remaining = totalMs
+            while (remaining > 0) {
+                _undoCountdownLeftMs.value = remaining
+                delay(tickMs.toLong())
+                remaining -= tickMs
             }
+            _undoCountdownLeftMs.value = 0
 
             val currentList = _additionHistory.value
             if (currentList.isNotEmpty()) {
@@ -157,7 +183,7 @@ class CircleViewModel(application: Application) : AndroidViewModel(application) 
         undoJob?.cancel()
         undoJob = null
         _isUndoCountingDown.value = false
-        _undoCountdownLeft.value = 0
+        _undoCountdownLeftMs.value = 0
     }
 
     private fun getRandomColorHex(index: Int): String {

@@ -59,6 +59,9 @@ fun MainControlPanel(
     val isServiceActive by viewModel.isServiceActive.collectAsStateWithLifecycle()
     val isOverlayGranted by viewModel.isOverlayPermissionGranted.collectAsStateWithLifecycle()
     val isPositioningMode by viewModel.isPositioningMode.collectAsStateWithLifecycle()
+    val isDelayEnabled by viewModel.isDelayEnabled.collectAsStateWithLifecycle()
+
+    var selectedTab by remember { mutableStateOf(0) } // 0 = التحكم, 1 = الإعدادات, 2 = التقارير
 
     // Professional Polish Color Palette (M3 Light Lavender/Purple Theme)
     val bgColor = Color(0xFFFEF7FF) // Main background light lavender
@@ -149,14 +152,22 @@ fun MainControlPanel(
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "مؤخر اللمس التخصيصي",
+                            text = when(selectedTab) {
+                                0 -> "مؤخر اللمس التخصيصي"
+                                1 -> "إعدادات وتراخيص النظام"
+                                else -> "تحليلات الأداء والتقارير"
+                            },
                             color = darkCharcoal,
                             fontSize = 22.sp,
                             fontWeight = FontWeight.ExtraBold,
                             textAlign = TextAlign.Center
                         )
                         Text(
-                            text = "تحكم كامل بهدوئك التقني عن طريق وضع دوائر شفافة على الشاشة لتأخير مدة الاستجابة للنقرات في الخلفية.",
+                            text = when(selectedTab) {
+                                0 -> "تحكم كامل بهدوئك التقني عن طريق وضع دوائر شفافة على الشاشة لتأخير مدة الاستجابة للنقرات في الخلفية."
+                                1 -> "قم بإدارة وتنشيط صلاحيات لوحة الضبط والتراجع السريع لتأمين عمل التطبيق بنجاح."
+                                else -> "اعرض إحصائيات وعمليات تشغيل مؤخر اللمس ونسب الاستجابة الدقيقة للدوائر."
+                            },
                             color = mutedPurpleText,
                             fontSize = 13.sp,
                             textAlign = TextAlign.Center,
@@ -165,8 +176,9 @@ fun MainControlPanel(
                     }
                 }
 
-                // High-Fidelity Interactive Visual Preview Canvas Room
-                item {
+                if (selectedTab == 0) {
+                    // High-Fidelity Interactive Visual Preview Canvas Room
+                    item {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -271,8 +283,9 @@ fun MainControlPanel(
                     }
                 }
 
-                // Permissions Card (Light polished theme style with M3 accents)
-                item {
+                if (selectedTab == 1) {
+                    // Permissions Card (Light polished theme style with M3 accents)
+                    item {
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -333,6 +346,147 @@ fun MainControlPanel(
                         }
                     }
                 }
+            }
+
+            if (selectedTab == 0) {
+                // ALWAYS show Permissions Card at the top of Control tab with dynamic state styling
+                val hasAllPermissions = isOverlayGranted && isServiceActive
+                val cardBorderColor = if (hasAllPermissions) Color(0xFFC6E7D2) else Color(0xFFFDC8C8)
+                val cardBgColor = if (hasAllPermissions) Color(0xFFF6FBF7) else Color(0xFFFFF5F5)
+                val cardTitleText = if (hasAllPermissions) "✅ جميع تراخيص التشغيل نشطة" else "⚠️ تراخيص التشغيل مطلوبة لتشغيل وظهور الدوائر"
+                val cardTitleColor = if (hasAllPermissions) Color(0xFF2F855A) else Color(0xFFC53030)
+                val dividerColor = if (hasAllPermissions) Color(0xFFC6E7D2).copy(alpha = 0.5f) else Color(0xFFFDC8C8).copy(alpha = 0.5f)
+
+                item {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, cardBorderColor, RoundedCornerShape(20.dp)),
+                        colors = CardDefaults.cardColors(containerColor = cardBgColor),
+                        shape = RoundedCornerShape(20.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = cardTitleText,
+                                    color = cardTitleColor,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 15.sp,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // Draw over applications overlay permission
+                            PermissionLightRow(
+                                title = "العرض وتغطية الشاشة (Overlay Permission)",
+                                description = "مطلوب لتغطية ومحاذاة الدوائر الشفافة في أي مكان تريده على شاشتك.",
+                                isGranted = isOverlayGranted,
+                                primaryPurple = primaryPurple,
+                                onGrantClick = {
+                                    try {
+                                        val intent = Intent(
+                                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                            Uri.parse("package:${context.packageName}")
+                                        )
+                                        context.startActivity(intent)
+                                    } catch (e: Exception) {
+                                        val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+                                        context.startActivity(intent)
+                                    }
+                                }
+                            )
+
+                            HorizontalDivider(
+                                color = dividerColor,
+                                modifier = Modifier.padding(vertical = 12.dp)
+                            )
+
+                            // Accessibility service interaction permission
+                            PermissionLightRow(
+                                title = "خدمة تسهيل الوصول (Accessibility Service)",
+                                description = "يجب تنشيط الخدمة ليتمكن التطبيق من تأخير النقرات وتوجيهها بدقة وإظهار الدوائر بالخلفية.",
+                                isGranted = isServiceActive,
+                                primaryPurple = primaryPurple,
+                                onGrantClick = {
+                                    val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                                    context.startActivity(intent)
+                                    showSingleToast(
+                                        context,
+                                        "ابحث عن [Touch Delayer] وقم بتنشيطه لتظهر الدوائر فوراً!",
+                                        Toast.LENGTH_LONG
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
+
+                // Global Enable/Disable Interception Switch Card
+                item {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, borderColor, RoundedCornerShape(20.dp)),
+                        colors = CardDefaults.cardColors(containerColor = if (isDelayEnabled) Color(0xFFF1EEFA) else Color(0xFFF1F3F5)),
+                        shape = RoundedCornerShape(20.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .background(
+                                                if (isDelayEnabled) primaryPurple.copy(alpha = 0.15f) else Color.Gray.copy(alpha = 0.15f),
+                                                CircleShape
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = if (isDelayEnabled) "⏳" else "⚡",
+                                            fontSize = 20.sp
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column {
+                                        Text(
+                                            text = if (isDelayEnabled) "تأخير اللمس: مفعّل بالكامل ⏳" else "تأخير اللمس: معطل (النقرات مباشرة) ⚡",
+                                            color = darkCharcoal,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp
+                                        )
+                                        Text(
+                                            text = if (isDelayEnabled) "النقرات على الدوائر تتأخر بالخلفية." else "النقرات تمر مباشرة فوراً دون تأخير.",
+                                            color = mutedPurpleText,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                }
+                                Switch(
+                                    checked = isDelayEnabled,
+                                    onCheckedChange = { viewModel.toggleDelayEnabled() },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = Color.White,
+                                        checkedTrackColor = primaryPurple,
+                                        uncheckedThumbColor = Color.Gray,
+                                        uncheckedTrackColor = Color.LightGray
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
 
                 // Positioning Switch Controller (Sleek light amber/lavender mode design)
                 item {
@@ -340,7 +494,7 @@ fun MainControlPanel(
                         modifier = Modifier
                             .fillMaxWidth()
                             .border(1.dp, borderColor, RoundedCornerShape(20.dp)),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        colors = CardDefaults.cardColors(containerColor = if (isPositioningMode) Color(0xFFFFF9E6) else Color(0xFFF2F9F3)),
                         shape = RoundedCornerShape(20.dp)
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
@@ -351,52 +505,76 @@ fun MainControlPanel(
                                     modifier = Modifier
                                         .size(40.dp)
                                         .background(
-                                            if (isPositioningMode) Color(0xFF6750A4).copy(alpha = 0.15f) else Color(0xFF38A169).copy(alpha = 0.12f),
+                                            if (isPositioningMode) Color(0xFFE5A100).copy(alpha = 0.15f) else Color(0xFF38A169).copy(alpha = 0.15f),
                                             CircleShape
                                         ),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
-                                        imageVector = if (isPositioningMode) Icons.Default.Menu else Icons.Default.Check,
-                                        contentDescription = "Mode Icon",
-                                        tint = if (isPositioningMode) Color(0xFF6750A4) else Color(0xFF38A169)
+                                        imageVector = if (isPositioningMode) Icons.Default.Warning else Icons.Default.Lock,
+                                        contentDescription = "Fix Status Icon",
+                                        tint = if (isPositioningMode) Color(0xFFD69E2E) else Color(0xFF38A169)
                                     )
                                 }
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = if (isPositioningMode) "تعديل مواقع الدوائر (فعال)" else "تأخير اللمس بالخلفية (فعال)",
+                                        text = if (isPositioningMode) "حالة التعديل: الدوائر حرة الحركة 🔓" else "حالة التثبيت: الدوائر مثبتة ومحمية 🔒",
                                         color = darkCharcoal,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 14.sp
                                     )
                                     Text(
-                                        text = if (isPositioningMode) "اسحب الدوائر في الخلفية بأصابعك لوضعها بأي مكان!" else "كل النقرات الواقعة على الدوائر تتأخر تلقائياً.",
+                                        text = if (isPositioningMode) "الدوائر غير ثابتة، يمكنك سحبها وتعديل مواقعها على شاشتك وتثبيتها الآن." else "الدوائر مثبتة ومحلتة في مكانها تماماً بالمليمتر ولا تؤثر على بقية أجهزة الشاشة.",
                                         color = mutedPurpleText,
                                         fontSize = 12.sp
                                     )
                                 }
-                                Switch(
-                                    checked = isPositioningMode,
-                                    onCheckedChange = { viewModel.togglePositioningMode() },
-                                    colors = SwitchDefaults.colors(
-                                        checkedThumbColor = primaryPurple,
-                                        checkedTrackColor = primaryPurple.copy(alpha = 0.4f),
-                                        uncheckedThumbColor = Color(0xFF64748B),
-                                        uncheckedTrackColor = Color(0xFF94A3B8).copy(alpha = 0.3f)
-                                    )
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            // The dedicated robust FIX BUTTON
+                            Button(
+                                onClick = {
+                                    viewModel.togglePositioningMode()
+                                    if (!isPositioningMode) {
+                                        showSingleToast(context, "تم تثبيت وحفظ الدوائر بالخلفية وتفعيل تأخير اللمس 🔒")
+                                    } else {
+                                        showSingleToast(context, "تم إلغاء التثبيت! اسحب الدوائر لوضعها وتعديلها 🔓")
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isPositioningMode) Color(0xFF38A169) else Color(0xFF6750A4)
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth().height(48.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isPositioningMode) Icons.Default.CheckCircle else Icons.Default.Edit,
+                                    contentDescription = null,
+                                    tint = Color.White
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (isPositioningMode) "تثبيت الدوائر وحفظ المواقع (Fix Button) 🔒" else "إلغاء التثبيت وتعديل المواقع 🔓",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
                                 )
                             }
                         }
                     }
                 }
+            }
 
+            if (selectedTab == 1) {
                 // Undo Button Config and Action Card
-                item {
+                    item {
                     val additionHistory by viewModel.additionHistory.collectAsStateWithLifecycle()
                     val undoDelaySeconds by viewModel.undoDelaySeconds.collectAsStateWithLifecycle()
                     val isUndoCountingDown by viewModel.isUndoCountingDown.collectAsStateWithLifecycle()
-                    val undoCountdownLeft by viewModel.undoCountdownLeft.collectAsStateWithLifecycle()
+                    val undoCountdownLeftMs by viewModel.undoCountdownLeftMs.collectAsStateWithLifecycle()
 
                     Card(
                         modifier = Modifier
@@ -439,9 +617,10 @@ fun MainControlPanel(
 
                             Spacer(modifier = Modifier.height(12.dp))
 
-                            // Configurable self-delay option (From 1 second up to 1 minute, i.e., 60 seconds)
+                            // Configurable self-delay option (From 0.25 second up to 1 minute, i.e., 60 seconds)
+                            val formattedDelay = String.format("%.2f", undoDelaySeconds)
                             Text(
-                                text = "مدة تأخير تنفيذ التراجع: (${undoDelaySeconds} ثانية)",
+                                text = "مدة تأخير تنفيذ التراجع: (${formattedDelay} ثانية)",
                                 color = darkCharcoal,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp
@@ -450,12 +629,11 @@ fun MainControlPanel(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text("1ث", fontSize = 11.sp, color = mutedPurpleText)
+                                Text("0.25ث", fontSize = 11.sp, color = mutedPurpleText)
                                 Slider(
-                                    value = undoDelaySeconds.toFloat(),
-                                    onValueChange = { viewModel.setUndoDelaySeconds(it.roundToInt()) },
-                                    valueRange = 1f..60f,
-                                    steps = 58,
+                                    value = undoDelaySeconds,
+                                    onValueChange = { viewModel.setUndoDelaySeconds(it) },
+                                    valueRange = 0.25f..60f,
                                     modifier = Modifier.weight(1f),
                                     colors = SliderDefaults.colors(
                                         thumbColor = primaryPurple,
@@ -485,8 +663,9 @@ fun MainControlPanel(
                                             strokeWidth = 2.5.dp
                                         )
                                         Spacer(modifier = Modifier.width(10.dp))
+                                        val timeLeftSec = String.format("%.2f", undoCountdownLeftMs / 1000f)
                                         Text(
-                                            text = "جاري التراجع خلال: ${undoCountdownLeft} ثانية...",
+                                            text = "جاري التراجع خلال: ${timeLeftSec} ثانية...",
                                             color = Color(0xFF92400E),
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 13.sp
@@ -531,7 +710,9 @@ fun MainControlPanel(
                         }
                     }
                 }
+            }
 
+            if (selectedTab == 0) {
                 // Configurations Title
                 item {
                     Row(
@@ -616,6 +797,134 @@ fun MainControlPanel(
                     }
                 }
             }
+        }
+
+        if (selectedTab == 2) {
+            // TAB 2: REPORTS & ANALYSIS (التقارير)
+                item {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, borderColor, RoundedCornerShape(20.dp)),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        shape = RoundedCornerShape(20.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(45.dp)
+                                        .background(primaryPurple.copy(alpha = 0.12f), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Info,
+                                        contentDescription = "Analysis",
+                                        tint = primaryPurple
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = "إحصائيات توجيه وتأخير اللمس الذاتية",
+                                        color = darkCharcoal,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 15.sp
+                                    )
+                                    Text(
+                                        text = "مراقبة حية للأداء ومعدلات الاستجابة بالدوائر النشطة.",
+                                        color = mutedPurpleText,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            // Simple dynamic metric visualizer
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color(0xFFF3EDF7))
+                                        .padding(12.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(text = "إجمالي الدوائر", fontSize = 11.sp, color = mutedPurpleText)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(text = "${circles.size}", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = primaryPurple)
+                                }
+
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color(0xFFF3EDF7))
+                                        .padding(12.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(text = "الدوائر النشطة", fontSize = 11.sp, color = mutedPurpleText)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(text = "${circles.filter { it.isEnabled }.size}", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF38A169))
+                                }
+
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color(0xFFF3EDF7))
+                                        .padding(12.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(text = "متوسط التأخير", fontSize = 11.sp, color = mutedPurpleText)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    val avgDelay = if (circles.isNotEmpty()) circles.map { it.delayMs }.average() else 0.0
+                                    Text(text = String.format("%.0fms", avgDelay), fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = darkCharcoal)
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+                            HorizontalDivider(color = borderColor.copy(alpha = 0.5f))
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Text(
+                                text = "توزيع التغطية ومؤقتات التأخير النشطة",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = darkCharcoal
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Visual progress bar representations
+                            circles.forEach { circle ->
+                                Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(text = "${circle.name} (المعرف: ${circle.id})", fontSize = 11.sp, color = darkCharcoal)
+                                        Text(text = "${circle.delayMs}ms", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = primaryPurple)
+                                    }
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    LinearProgressIndicator(
+                                        progress = { (circle.delayMs / 2000f).coerceIn(0f, 1f) },
+                                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(100.dp)),
+                                        color = primaryPurple,
+                                        trackColor = borderColor.copy(alpha = 0.3f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
             // Bottom Navigation & Actions Layout Block
             Surface(
@@ -630,35 +939,37 @@ fun MainControlPanel(
                         .navigationBarsPadding()
                         .padding(horizontal = 16.dp, vertical = 14.dp)
                 ) {
-                    // Big CTA Action Button: Add New Delay Zone
-                    Button(
-                        onClick = {
-                            val widthPx = context.resources.displayMetrics.widthPixels
-                            viewModel.addNewCircle(widthPx)
-                            showSingleToast(context, "تم إضافة دائرة جديدة لتخصيصها!")
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = primaryPurple),
-                        shape = RoundedCornerShape(100.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(54.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
+                    if (selectedTab == 0) {
+                        // Big CTA Action Button: Add New Delay Zone
+                        Button(
+                            onClick = {
+                                val widthPx = context.resources.displayMetrics.widthPixels
+                                viewModel.addNewCircle(widthPx)
+                                showSingleToast(context, "تم إضافة دائرة جديدة لتخصيصها!")
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = primaryPurple),
+                            shape = RoundedCornerShape(100.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(54.dp)
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = "أضف", tint = Color.White)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "إضافة دائرة تأخير جديدة",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = "أضف", tint = Color.White)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "إضافة دائرة تأخير جديدة",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 16.sp
+                                )
+                            }
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
 
                     // Simulated 3-tab modern M3 bottom options
                     Row(
@@ -666,9 +977,15 @@ fun MainControlPanel(
                         horizontalArrangement = Arrangement.SpaceAround,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        BottomNavBarTab(iconLabel = "🏠", title = "التحكم", isActive = true)
-                        BottomNavBarTab(iconLabel = "⚙️", title = "الإعدادات", isActive = false)
-                        BottomNavBarTab(iconLabel = "📊", title = "التقارير", isActive = false)
+                        BottomNavBarTab(iconLabel = "🏠", title = "التحكم", isActive = selectedTab == 0) {
+                            selectedTab = 0
+                        }
+                        BottomNavBarTab(iconLabel = "⚙️", title = "الإعدادات", isActive = selectedTab == 1) {
+                            selectedTab = 1
+                        }
+                        BottomNavBarTab(iconLabel = "📊", title = "التقارير", isActive = selectedTab == 2) {
+                            selectedTab = 2
+                        }
                     }
                 }
             }
@@ -677,11 +994,11 @@ fun MainControlPanel(
 }
 
 @Composable
-fun BottomNavBarTab(iconLabel: String, title: String, isActive: Boolean) {
+fun BottomNavBarTab(iconLabel: String, title: String, isActive: Boolean, onClick: () -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .clickable { }
+            .clickable { onClick() }
             .padding(horizontal = 12.dp, vertical = 6.dp)
             .alpha(if (isActive) 1.0f else 0.45f)
     ) {
@@ -897,8 +1214,7 @@ fun PolishedCircleCard(
                         Slider(
                             value = circle.delayMs.toFloat(),
                             onValueChange = { onUpdate(circle.copy(delayMs = it.roundToInt().toLong())) },
-                            valueRange = 100f..2000f,
-                            steps = 19,
+                            valueRange = 10f..2000f,
                             colors = SliderDefaults.colors(
                                 thumbColor = colorAccent,
                                 activeTrackColor = colorAccent
@@ -914,6 +1230,45 @@ fun PolishedCircleCard(
                             modifier = Modifier.width(55.dp),
                             textAlign = TextAlign.End
                         )
+                    }
+
+                    // Quick Select Presets row
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        val presets = listOf(
+                            15L to "15 ملي ثانية",
+                            50L to "50 ملي ثانية",
+                            250L to "250 ملي ثانية",
+                            1000L to "1.00ثانية"
+                        )
+                        presets.forEach { (ms, label) ->
+                            val isSelected = circle.delayMs == ms
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSelected) colorAccent.copy(alpha = 0.15f) else Color.White)
+                                    .border(
+                                        1.dp,
+                                        if (isSelected) colorAccent else Color(0xFFCAC4D0),
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .clickable { onUpdate(circle.copy(delayMs = ms)) }
+                                    .padding(vertical = 6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = label,
+                                    fontSize = 10.sp,
+                                    color = if (isSelected) colorAccent else darkCharcoal,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
